@@ -242,3 +242,38 @@ async def process_order_by_id(message: types.Message, state: FSMContext):
             reply_markup=bottles_count_keyboard(language)
         )
         await state.set_state(RegistrationStates.bottles_count)
+
+@router.message(F.text.in_(["Профиль", "Profile"]))
+async def profile_callback(message: types.Message, state: FSMContext):
+    user_data = await state.get_data()
+    language = user_data.get("language", "ru")
+
+    async with AsyncSessionLocal() as session:
+        # Ищем пользователя в базе данных
+        user = await session.get(User, message.from_user.id)
+        if not user:
+            await message.answer(
+                "Вы еще не зарегистрированы." if language == "ru" else "You are not registered yet.",
+                reply_markup=main_menu_keyboard(language)
+            )
+            return
+
+        # Форматируем данные профиля
+        if language == "ru":
+            profile_text = (
+                "📱 Ваш профиль:\n"
+                f"👤 Имя: {user.full_name}\n"
+                f"📞 Номер телефона: {user.phone_number}\n"
+                f"📍 Адрес: {user.address}\n"
+                f"🌐 Язык: {user.language}"
+            )
+        else:
+            profile_text = (
+                "📱 Your profile:\n"
+                f"👤 Name: {user.full_name}\n"
+                f"📞 Phone number: {user.phone_number}\n"
+                f"📍 Address: {user.address}\n"
+                f"🌐 Language: {user.language}"
+            )
+
+        await message.answer(profile_text, reply_markup=main_menu_keyboard(language))
