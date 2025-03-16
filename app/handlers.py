@@ -289,9 +289,10 @@ async def change_language_callback(message: types.Message, state: FSMContext):
         reply_markup=language_keyboard()
     )
 
-# Обработчик кнопки "Назад"
-@router.message(F.text.in_(["⬅️ Назад", "⬅️ Back"]))
-async def back_to_main_menu(message: types.Message, state: FSMContext):
+
+# Обработчик ввода ID для заказа по ID
+@router.message(RegistrationStates.order_by_id, F.text)
+async def process_order_by_id(message: types.Message, state: FSMContext):
     user_data = await state.get_data()
     language = user_data.get("language", "ru")
 
