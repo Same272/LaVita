@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy import Column, Integer, String, DateTime, Float
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
@@ -20,6 +20,8 @@ class User(Base):
     phone_number = Column(String)
     address = Column(String)
     language = Column(String, default="ru")
+    balance = Column(Float, default=0.0)  # Баланс пользователя
+    total_spent = Column(Float, default=0.0)  # Общая сумма потраченных средств
 
 class Order(Base):
     __tablename__ = "orders"
@@ -29,6 +31,7 @@ class Order(Base):
     location = Column(String)
     status = Column(String, default="active")
     created_at = Column(DateTime, default=datetime.utcnow)
+    total_cost = Column(Float)  # Стоимость заказа
 
 async def init_db():
     async with engine.begin() as conn:
