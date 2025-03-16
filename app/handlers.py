@@ -243,7 +243,38 @@ async def process_order_by_id(message: types.Message, state: FSMContext):
         )
         await state.set_state(RegistrationStates.bottles_count)
 
-@router.message(F.text.in_(["Профиль", "Profile"]))
+        if not orders:
+            await message.answer(
+                "У вас нет активных заказов." if language == "ru" else "You have no active orders.",
+                reply_markup=main_menu_keyboard(language)
+            )
+            return
+
+        # Форматируем список активных заказов
+        if language == "ru":
+            orders_text = "📦 Ваши активные заказы:\n"
+            for order in orders:
+                orders_text += (
+                    f"🆔 ID заказа: {order.id}\n"
+                    f"🧊 Количество бутылок: {order.bottles_count}\n"
+                    f"💸 Стоимость: {order.total_cost} сум\n"
+                    f"📍 Адрес доставки: {order.location}\n\n"
+                )
+        else:
+            orders_text = "📦 Your active orders:\n"
+            for order in orders:
+                orders_text += (
+                    f"🆔 Order ID: {order.id}\n"
+                    f"🧊 Number of bottles: {order.bottles_count}\n"
+                    f"💸 Cost: {order.total_cost} UZS\n"
+                    f"📍 Delivery address: {order.location}\n\n"
+                )
+
+        await message.answer(orders_text, reply_markup=main_menu_keyboard(language))
+
+
+# Обработчик кнопки "Профиль"
+@router.message(F.text.in_(["👤 Профиль", "👤 Profile"]))
 async def profile_callback(message: types.Message, state: FSMContext):
     user_data = await state.get_data()
     language = user_data.get("language", "ru")
