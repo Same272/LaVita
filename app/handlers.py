@@ -295,7 +295,43 @@ async def back_to_main_menu(message: types.Message, state: FSMContext):
     user_data = await state.get_data()
     language = user_data.get("language", "ru")
 
-    await message.answer(
-        "Выберите действие:" if language == "ru" else "Choose action:",
-        reply_markup=main_menu_keyboard(language)
-    )
+    if message.text in ["⬅️ Назад", "⬅️ Back"]:
+        await message.answer(
+            "Выберите действие:" if language == "ru" else "Choose action:",
+            reply_markup=main_menu_keyboard(language)
+        )
+        await state.clear()
+        return
+
+    try:
+        amount = float(message.text)  # Пытаемся преобразовать введенный текст в число
+        if amount <= 0:
+            raise ValueError
+    except ValueError:
+        await message.answer(
+            "Неверная сумма. Введите положительное число." if language == "ru" else "Invalid amount. Enter a positive number."
+        )
+        return
+
+    # Пополняем баланс
+    async with AsyncSessionLocal() as session:
+        user = await session.get(User, message.from_user.id)
+        if not user:
+            await message.answer(
+                "Вы еще не зарегистрированы." if language == "ru" else "You are not registered yet.",
+                reply_markup=main_menu_keyboard(language)
+            )
+            return
+
+        user.balance += amount
+        session.add(user)
+        await session.commit()
+
+        # Текст после успешного пополнения
+        if language == "ru":
+            success_message = f"✅ Баланс успешно пополнен на {amount} сум. Текущий баланс: {user.balance} сум."
+        else:
+            success_message = f"✅ Balance successfully topped up by {amount} UZS. Current balance: {user.balance} UZS."
+
+        await message.answer(success_message, reply_markup=main_menu_keyboard(language))
+        await state.clear()
