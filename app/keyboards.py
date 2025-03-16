@@ -128,3 +128,19 @@ def back_keyboard(language="ru"):
             ],
             resize_keyboard=True
         )
+    
+def profile_keyboard(language="ru"):
+    if language == "ru":
+        return ReplyKeyboardMarkup(
+            keyboard=[
+                [KeyboardButton(text="Изменить язык"), KeyboardButton(text="Назад")],
+            ],
+            resize_keyboard=True
+        )
+    else:
+        return ReplyKeyboardMarkup(
+            keyboard=[
+                [KeyboardButton(text="Change language"), KeyboardButton(text="Back")],
+            ],
+            resize_keyboard=True
+        )
