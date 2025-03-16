@@ -29,7 +29,7 @@ async def start_command(message: types.Message):
         "🚰 Мы доставляем чистую воду прямо к вам домой или в офис.\n"
         "👇 Выберите язык:"
     )
-    photo_url = "https://telegra.ph/file/a761e51a713289a2bfa28.jpg"  # Замените на реальный URL фото
+    photo_url = "https://telegra.ph/file/a761e51a713289a2bfa28.jpg"
     await message.answer_photo(
         photo=photo_url,
         caption=welcome_text,
@@ -42,6 +42,156 @@ async def language_callback(callback_query: types.CallbackQuery, state: FSMConte
     language = callback_query.data.split("_")[1]
     await state.update_data(language=language)
     await callback_query.message.answer("Выберите действие:", reply_markup=main_menu_keyboard(language))
+
+# Обработчик кнопки "Заказать"
+@router.message(F.text.in_(["Заказать", "Order"]))
+async def order_callback(message: types.Message, state: FSMContext):
+    user_data = await state.get_data()
+    language = user_data.get("language", "ru")
+
+    async with AsyncSessionLocal() as session:
+        # Проверяем, зарегистрирован ли пользователь
+        user = await session.get(User, message.from_user.id)
+        if not user:
+            # Если пользователь не зарегистрирован, запрашиваем номер телефона
+            await message.answer(
+                "Пожалуйста, отправьте ваш номер телефона:" if language == "ru" else "Please share your phone number:",
+                reply_markup=phone_number_keyboard(language)
+            )
+            await state.set_state(RegistrationStates.phone_number)
+        else:
+            # Если пользователь зарегистрирован, переходим к выбору количества бутылок
+            await message.answer(
+                "Введите количество бутылок:" if language == "ru" else "Enter the number of bottles:",
+                reply_markup=bottles_count_keyboard(language)
+            )
+            await state.set_state(RegistrationStates.bottles_count)
+
+# Обработчик номера телефона
+@router.message(RegistrationStates.phone_number, F.contact | F.text.in_(["Назад", "Back"]))
+async def process_phone_number(message: types.Message, state: FSMContext):
+    user_data = await state.get_data()
+    language = user_data.get("language", "ru")
+
+    if message.text in ["Назад", "Back"]:
+        await message.answer("Выберите действие:", reply_markup=main_menu_keyboard(language))
+        await state.clear()
+        return
+
+    phone_number = message.contact.phone_number
+    await state.update_data(phone_number=phone_number)
+
+    # Запрашиваем геолокацию
+    await message.answer(
+        "Поделитесь своей геолокацией:" if language == "ru" else "Share your location:",
+        reply_markup=location_keyboard(language)
+    )
+    await state.set_state(RegistrationStates.location)
+
+# Обработчик геолокации
+@router.message(RegistrationStates.location, F.location | F.text.in_(["Назад", "Back"]))
+async def process_location(message: types.Message, state: FSMContext):
+    user_data = await state.get_data()
+    language = user_data.get("language", "ru")
+
+    if message.text in ["Назад", "Back"]:
+        await message.answer("Пожалуйста, отправьте ваш номер телефона:", reply_markup=phone_number_keyboard(language))
+        await state.set_state(RegistrationStates.phone_number)
+        return
+
+    location = message.location
+    await state.update_data(location=location)
+
+    # Регистрируем пользователя
+    async with AsyncSessionLocal() as session:
+        user = User(
+            id=message.from_user.id,
+            username=message.from_user.username,
+            full_name=message.from_user.full_name,
+            phone_number=user_data["phone_number"],
+            language=language
+        )
+        session.add(user)
+        await session.commit()
+
+    # Переходим к выбору количества бутылок
+    await message.answer(
+        "Введите количество бутылок:" if language == "ru" else "Enter the number of bottles:",
+        reply_markup=bottles_count_keyboard(language)
+    )
+    await state.set_state(RegistrationStates.bottles_count)
+
+# Обработчик ввода количества бутылок
+@router.message(RegistrationStates.bottles_count, F.text)
+async def process_bottles_count(message: types.Message, state: FSMContext):
+    user_data = await state.get_data()
+    language = user_data.get("language", "ru")
+
+    if message.text in ["Назад", "Back"]:
+        await message.answer("Выберите действие:", reply_markup=main_menu_keyboard(language))
+        await state.clear()
+        return
+
+    try:
+        bottles_count = int(message.text)  # Пытаемся преобразовать введенный текст в число
+        if bottles_count < 1:
+            raise ValueError
+    except ValueError:
+        await message.answer(
+            "Неверное количество бутылок. Введите число больше 0." if language == "ru" else "Invalid number of bottles. Enter a number greater than 0."
+        )
+        return
+
+    # Сохраняем количество бутылок в состоянии
+    await state.update_data(bottles_count=bottles_count)
+
+    # Подтверждение заказа
+    await message.answer(
+        "Подтвердите заказ:" if language == "ru" else "Confirm the order:",
+        reply_markup=confirm_keyboard(language)
+    )
+    await state.set_state(RegistrationStates.confirm_order)
+
+# Обработчик подтверждения заказа
+@router.message(RegistrationStates.confirm_order, F.text.in_(["Подтвердить", "Confirm", "Назад", "Back"]))
+async def process_confirm_order(message: types.Message, state: FSMContext):
+    if message.text in ["Назад", "Back"]:
+        user_data = await state.get_data()
+        language = user_data.get("language", "ru")
+        await message.answer("Введите количество бутылок:", reply_markup=bottles_count_keyboard(language))
+        await state.set_state(RegistrationStates.bottles_count)
+        return
+
+    user_data = await state.get_data()
+    language = user_data.get("language", "ru")
+    async with AsyncSessionLocal() as session:
+        # Создаем новый заказ
+        order = Order(
+            user_id=message.from_user.id,
+            bottles_count=user_data["bottles_count"],
+            location=str(user_data["location"])
+        )
+        session.add(order)
+        await session.commit()
+
+        # Текст после успешного заказа
+        if language == "ru":
+            success_message = (
+                "✅ Ваш заказ успешно принят!\n"
+                f"🧊 Количество бутылок: {user_data['bottles_count']}\n"
+                f"📍 Адрес доставки: {user_data['location']}\n"
+                "🙏 Спасибо за ваш заказ!"
+            )
+        else:
+            success_message = (
+                "✅ Your order has been successfully placed!\n"
+                f"🧊 Number of bottles: {user_data['bottles_count']}\n"
+                f"📍 Delivery address: {user_data['location']}\n"
+                "🙏 Thank you for your order!"
+            )
+
+        await message.answer(success_message, reply_markup=main_menu_keyboard(language))
+        await state.clear()
 
 # Обработчик кнопки "Заказать по ID"
 @router.message(F.text.in_(["Заказать по ID", "Order by ID"]))
@@ -92,96 +242,3 @@ async def process_order_by_id(message: types.Message, state: FSMContext):
             reply_markup=bottles_count_keyboard(language)
         )
         await state.set_state(RegistrationStates.bottles_count)
-
-# Обработчик ввода количества бутылок
-@router.message(RegistrationStates.bottles_count, F.text)
-async def process_bottles_count(message: types.Message, state: FSMContext):
-    user_data = await state.get_data()
-    language = user_data.get("language", "ru")
-
-    if message.text in ["Назад", "Back"]:
-        await message.answer("Введите ваш ID:", reply_markup=back_keyboard(language))
-        await state.set_state(RegistrationStates.order_by_id)
-        return
-
-    try:
-        bottles_count = int(message.text)  # Пытаемся преобразовать введенный текст в число
-        if bottles_count < 1:
-            raise ValueError
-    except ValueError:
-        await message.answer(
-            "Неверное количество бутылок. Введите число больше 0." if language == "ru" else "Invalid number of bottles. Enter a number greater than 0."
-        )
-        return
-
-    # Сохраняем количество бутылок в состоянии
-    await state.update_data(bottles_count=bottles_count)
-
-    # Запрашиваем геолокацию
-    await message.answer(
-        "Поделитесь своей геолокацией:" if language == "ru" else "Share your location:",
-        reply_markup=location_keyboard(language)
-    )
-    await state.set_state(RegistrationStates.location)
-
-# Обработчик геолокации
-@router.message(RegistrationStates.location, F.location | F.text.in_(["Назад", "Back"]))
-async def process_location(message: types.Message, state: FSMContext):
-    user_data = await state.get_data()
-    language = user_data.get("language", "ru")
-
-    if message.text in ["Назад", "Back"]:
-        await message.answer("Введите количество бутылок:", reply_markup=bottles_count_keyboard(language))
-        await state.set_state(RegistrationStates.bottles_count)
-        return
-
-    location = message.location
-    await state.update_data(location=location)
-
-    # Подтверждение заказа
-    await message.answer(
-        "Подтвердите заказ:" if language == "ru" else "Confirm the order:",
-        reply_markup=confirm_keyboard(language)
-    )
-    await state.set_state(RegistrationStates.confirm_order)
-
-# Обработчик подтверждения заказа
-@router.message(RegistrationStates.confirm_order, F.text.in_(["Подтвердить", "Confirm", "Назад", "Back"]))
-async def process_confirm_order(message: types.Message, state: FSMContext):
-    if message.text in ["Назад", "Back"]:
-        user_data = await state.get_data()
-        language = user_data.get("language", "ru")
-        await message.answer("Поделитесь своей геолокацией:", reply_markup=location_keyboard(language))
-        await state.set_state(RegistrationStates.location)
-        return
-
-    user_data = await state.get_data()
-    language = user_data.get("language", "ru")
-    async with AsyncSessionLocal() as session:
-        # Создаем новый заказ
-        order = Order(
-            user_id=user_data["user_id"],
-            bottles_count=user_data["bottles_count"],
-            location=str(user_data["location"])
-        )
-        session.add(order)
-        await session.commit()
-
-        # Текст после успешного заказа
-        if language == "ru":
-            success_message = (
-                "✅ Ваш заказ успешно принят!\n"
-                f"🧊 Количество бутылок: {user_data['bottles_count']}\n"
-                f"📍 Адрес доставки: {user_data['location']}\n"
-                "🙏 Спасибо за ваш заказ!"
-            )
-        else:
-            success_message = (
-                "✅ Your order has been successfully placed!\n"
-                f"🧊 Number of bottles: {user_data['bottles_count']}\n"
-                f"📍 Delivery address: {user_data['location']}\n"
-                "🙏 Thank you for your order!"
-            )
-
-        await message.answer(success_message, reply_markup=main_menu_keyboard(language))
-        await state.clear()
