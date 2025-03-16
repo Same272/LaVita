@@ -241,7 +241,7 @@ async def process_order_by_id(message: types.Message, state: FSMContext):
             "Введите количество бутылок:" if language == "ru" else "Enter the number of bottles:",
             reply_markup=bottles_count_keyboard(language)
         )
-        await state.set_state(RegistrationStates.bottles_count)
+        orders = orders.scalars().all()
 
         if not orders:
             await message.answer(
