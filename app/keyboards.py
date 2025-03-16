@@ -145,3 +145,22 @@ def profile_keyboard(language="ru"):
             ],
             resize_keyboard=True
         )
+
+# Клавиатура для трат
+def expenses_keyboard(language="ru"):
+    if language == "ru":
+        return ReplyKeyboardMarkup(
+            keyboard=[
+                [KeyboardButton(text="📦 По заказам")],
+                [KeyboardButton(text="⬅️ Назад")]
+            ],
+            resize_keyboard=True
+        )
+    else:
+        return ReplyKeyboardMarkup(
+            keyboard=[
+                [KeyboardButton(text="📦 By Orders")],
+                [KeyboardButton(text="⬅️ Back")]
+            ],
+            resize_keyboard=True
+        )
