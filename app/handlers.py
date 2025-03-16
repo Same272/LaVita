@@ -276,4 +276,26 @@ async def profile_callback(message: types.Message, state: FSMContext):
                 f"🌐 Language: {user.language}"
             )
 
-        await message.answer(profile_text, reply_markup=main_menu_keyboard(language))
+        await message.answer(profile_text, reply_markup=profile_keyboard(language))
+
+# Обработчик кнопки "Изменить язык"
+@router.message(F.text.in_(["🌐 Изменить язык", "🌐 Change language"]))
+async def change_language_callback(message: types.Message, state: FSMContext):
+    user_data = await state.get_data()
+    language = user_data.get("language", "ru")
+
+    await message.answer(
+        "Выберите язык:" if language == "ru" else "Choose language:",
+        reply_markup=language_keyboard()
+    )
+
+# Обработчик кнопки "Назад"
+@router.message(F.text.in_(["⬅️ Назад", "⬅️ Back"]))
+async def back_to_main_menu(message: types.Message, state: FSMContext):
+    user_data = await state.get_data()
+    language = user_data.get("language", "ru")
+
+    await message.answer(
+        "Выберите действие:" if language == "ru" else "Choose action:",
+        reply_markup=main_menu_keyboard(language)
+    )
