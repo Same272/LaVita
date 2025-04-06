@@ -20,7 +20,6 @@ class User(Base):
     phone_number = Column(String)
     address = Column(String)
     language = Column(String, default="ru")
-    balance = Column(Float, default=0.0)  # Баланс пользователя
     total_spent = Column(Float, default=0.0)  # Общая сумма потраченных средств
 
 class Order(Base):

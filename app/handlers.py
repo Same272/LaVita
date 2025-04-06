@@ -6,7 +6,7 @@ from sqlalchemy import select
 from database.models import AsyncSessionLocal, User, Order
 from app.keyboards import (
     language_keyboard, main_menu_keyboard, phone_number_keyboard,
-    location_keyboard, confirm_keyboard, bottles_count_keyboard, back_keyboard, profile_keyboard
+    location_keyboard, confirm_keyboard, bottles_count_keyboard, back_keyboard, profile_keyboard, expenses_keyboard
 )
 import aiohttp
 
@@ -24,7 +24,6 @@ class RegistrationStates(StatesGroup):
     bottles_count = State()
     confirm_order = State()
     order_by_id = State()
-    top_up_balance = State()  # Состояние для пополнения баланса
 
 
 # Функция для получения адреса по координатам (Nominatim API)
@@ -238,10 +237,10 @@ async def process_confirm_order(message: types.Message, state: FSMContext):
 
     if message.text in ["⬅️ Назад", "⬅️ Back"]:
         await message.answer(
-            "Выберите действие:" if language == "ru" else "Choose action:",
-            reply_markup=main_menu_keyboard(language)
+            "Введите количество бутылок:" if language == "ru" else "Enter the number of bottles:",
+            reply_markup=bottles_count_keyboard(language)
         )
-        await state.clear()
+        await state.set_state(RegistrationStates.bottles_count)
         return
 
     # Стоимость одной бутылки
@@ -259,16 +258,6 @@ async def process_confirm_order(message: types.Message, state: FSMContext):
             )
             return
 
-        # Проверяем, хватает ли баланса
-        if user.balance < total_cost:
-            await message.answer(
-                "Недостаточно средств на балансе. Пожалуйста, пополните баланс."
-                if language == "ru"
-                else "Insufficient funds. Please top up your balance.",
-                reply_markup=main_menu_keyboard(language)
-            )
-            return
-
         # Создаем новый заказ
         order = Order(
             user_id=message.from_user.id,
@@ -279,8 +268,7 @@ async def process_confirm_order(message: types.Message, state: FSMContext):
         )
         session.add(order)
 
-        # Обновляем баланс и траты пользователя
-        user.balance -= total_cost
+        # Обновляем общую сумму потраченных средств
         user.total_spent += total_cost
         session.add(user)
 
@@ -293,7 +281,6 @@ async def process_confirm_order(message: types.Message, state: FSMContext):
                 f"🧊 Количество бутылок: {bottles_count}\n"
                 f"💸 Стоимость заказа: {total_cost} сум\n"
                 f"📍 Адрес доставки: {user_data['location']}\n"
-                f"💵 Остаток на балансе: {user.balance} сум\n"
                 "🙏 Спасибо за ваш заказ!"
             )
         else:
@@ -302,7 +289,6 @@ async def process_confirm_order(message: types.Message, state: FSMContext):
                 f"🧊 Number of bottles: {bottles_count}\n"
                 f"💸 Order cost: {total_cost} UZS\n"
                 f"📍 Delivery address: {user_data['location']}\n"
-                f"💵 Remaining balance: {user.balance} UZS\n"
                 "🙏 Thank you for your order!"
             )
 
@@ -310,9 +296,9 @@ async def process_confirm_order(message: types.Message, state: FSMContext):
         await state.clear()
 
 
-# Обработчик кнопки "Баланс и траты"
-@router.message(F.text.in_(["💰 Баланс и траты", "💰 Balance & Expenses"]))
-async def balance_and_expenses_callback(message: types.Message, state: FSMContext):
+# Обработчик кнопки "Траты"
+@router.message(F.text.in_(["💰 Траты", "💰 Expenses"]))
+async def expenses_callback(message: types.Message, state: FSMContext):
     user_data = await state.get_data()
     language = user_data.get("language", "ru")
 
@@ -326,87 +312,24 @@ async def balance_and_expenses_callback(message: types.Message, state: FSMContex
             )
             return
 
-        # Форматируем данные о балансе и тратах
+        # Форматируем данные о тратах
         if language == "ru":
-            balance_text = (
-                "💰 Ваш баланс:\n"
-                f"💵 Текущий баланс: {user.balance} сум\n"
+            expenses_text = (
+                "💰 Ваши траты:\n"
                 f"💸 Всего потрачено: {user.total_spent} сум"
             )
         else:
-            balance_text = (
-                "💰 Your balance:\n"
-                f"💵 Current balance: {user.balance} UZS\n"
+            expenses_text = (
+                "💰 Your expenses:\n"
                 f"💸 Total spent: {user.total_spent} UZS"
             )
 
-        await message.answer(balance_text, reply_markup=main_menu_keyboard(language))
+        await message.answer(expenses_text, reply_markup=expenses_keyboard(language))
 
 
-# Обработчик кнопки "Пополнить баланс"
-@router.message(F.text.in_(["💳 Пополнить баланс", "💳 Top Up Balance"]))
-async def top_up_balance_callback(message: types.Message, state: FSMContext):
-    user_data = await state.get_data()
-    language = user_data.get("language", "ru")
-
-    await message.answer(
-        "Введите сумму для пополнения баланса:" if language == "ru" else "Enter the amount to top up your balance:",
-        reply_markup=back_keyboard(language)
-    )
-    await state.set_state(RegistrationStates.top_up_balance)
-
-
-# Обработчик ввода суммы для пополнения баланса
-@router.message(RegistrationStates.top_up_balance, F.text)
-async def process_top_up_balance(message: types.Message, state: FSMContext):
-    user_data = await state.get_data()
-    language = user_data.get("language", "ru")
-
-    if message.text in ["⬅️ Назад", "⬅️ Back"]:
-        await message.answer(
-            "Выберите действие:" if language == "ru" else "Choose action:",
-            reply_markup=main_menu_keyboard(language)
-        )
-        await state.clear()
-        return
-
-    try:
-        amount = float(message.text)  # Пытаемся преобразовать введенный текст в число
-        if amount <= 0:
-            raise ValueError
-    except ValueError:
-        await message.answer(
-            "Неверная сумма. Введите положительное число." if language == "ru" else "Invalid amount. Enter a positive number."
-        )
-        return
-
-    # Пополняем баланс
-    async with AsyncSessionLocal() as session:
-        user = await session.get(User, message.from_user.id)
-        if not user:
-            await message.answer(
-                "Вы еще не зарегистрированы." if language == "ru" else "You are not registered yet.",
-                reply_markup=main_menu_keyboard(language)
-            )
-            return
-
-        user.balance += amount
-        session.add(user)
-        await session.commit()
-
-        # Текст после успешного пополнения
-        if language == "ru":
-            success_message = f"✅ Баланс успешно пополнен на {amount} сум. Текущий баланс: {user.balance} сум."
-        else:
-            success_message = f"✅ Balance successfully topped up by {amount} UZS. Current balance: {user.balance} UZS."
-
-        await message.answer(success_message, reply_markup=main_menu_keyboard(language))
-        await state.clear()
-
-
-# Обработчик кнопки "История заказов"
-@router.message(F.text.in_(["📜 История заказов", "📜 Order History"]))
-async def order_history_callback(message: types.Message, state: FSMContext):
+# Обработчик кнопки "По заказам" (история заказов)
+@router.message(F.text.in_(["📦 По заказам", "📦 By Orders"]))
+async def expenses_by_orders_callback(message: types.Message, state: FSMContext):
     user_data = await state.get_data()
     language = user_data.get("language", "ru")
 
@@ -419,42 +342,40 @@ async def order_history_callback(message: types.Message, state: FSMContext):
 
         if not orders:
             await message.answer(
-                "У вас нет завершенных заказов." if language == "ru" else "You have no completed orders.",
-                reply_markup=main_menu_keyboard(language)
+                "У вас нет заказов." if language == "ru" else "You have no orders.",
+                reply_markup=expenses_keyboard(language)
             )
             return
 
         # Форматируем список заказов
         if language == "ru":
-            orders_text = "📜 История ваших заказов:\n"
+            orders_text = "📦 Ваши заказы:\n"
             for order in orders:
-                status = "✅ Доставлен" if order.status == "completed" else "🔄 В процессе"
                 orders_text += (
                     f"🆔 ID заказа: {order.id}\n"
                     f"🧊 Количество бутылок: {order.bottles_count}\n"
                     f"💸 Стоимость: {order.total_cost} сум\n"
                     f"📍 Адрес доставки: {order.location}\n"
                     f"📅 Дата: {order.created_at}\n"
-                    f"📦 Статус: {status}\n\n"
+                    f"📌 Статус: {order.status}\n\n"
                 )
         else:
-            orders_text = "📜 Your order history:\n"
+            orders_text = "📦 Your orders:\n"
             for order in orders:
-                status = "✅ Delivered" if order.status == "completed" else "🔄 In progress"
                 orders_text += (
                     f"🆔 Order ID: {order.id}\n"
                     f"🧊 Number of bottles: {order.bottles_count}\n"
                     f"💸 Cost: {order.total_cost} UZS\n"
                     f"📍 Delivery address: {order.location}\n"
                     f"📅 Date: {order.created_at}\n"
-                    f"📦 Status: {status}\n\n"
+                    f"📌 Status: {order.status}\n\n"
                 )
 
-        await message.answer(orders_text, reply_markup=main_menu_keyboard(language))
+        await message.answer(orders_text, reply_markup=expenses_keyboard(language))
 
 
 # Обработчик кнопки "Активные заказы"
-@router.message(F.text.in_(["📦 Активные заказы", "📦 Active Orders"]))
+@router.message(F.text.in_(["📌 Активные заказы", "📌 Active Orders"]))
 async def active_orders_callback(message: types.Message, state: FSMContext):
     user_data = await state.get_data()
     language = user_data.get("language", "ru")
@@ -462,38 +383,43 @@ async def active_orders_callback(message: types.Message, state: FSMContext):
     async with AsyncSessionLocal() as session:
         # Ищем активные заказы пользователя
         orders = await session.execute(
-            select(Order).where(Order.user_id == message.from_user.id, Order.status == "active")
+            select(Order).where(
+                (Order.user_id == message.from_user.id) &
+                (Order.status == "active")
+            )
         )
         orders = orders.scalars().all()
 
         if not orders:
             await message.answer(
                 "У вас нет активных заказов." if language == "ru" else "You have no active orders.",
-                reply_markup=main_menu_keyboard(language)
+                reply_markup=expenses_keyboard(language)
             )
             return
 
         # Форматируем список активных заказов
         if language == "ru":
-            orders_text = "📦 Ваши активные заказы:\n"
+            orders_text = "📌 Ваши активные заказы:\n"
             for order in orders:
                 orders_text += (
                     f"🆔 ID заказа: {order.id}\n"
                     f"🧊 Количество бутылок: {order.bottles_count}\n"
                     f"💸 Стоимость: {order.total_cost} сум\n"
-                    f"📍 Адрес доставки: {order.location}\n\n"
+                    f"📍 Адрес доставки: {order.location}\n"
+                    f"📅 Дата: {order.created_at}\n\n"
                 )
         else:
-            orders_text = "📦 Your active orders:\n"
+            orders_text = "📌 Your active orders:\n"
             for order in orders:
                 orders_text += (
                     f"🆔 Order ID: {order.id}\n"
                     f"🧊 Number of bottles: {order.bottles_count}\n"
                     f"💸 Cost: {order.total_cost} UZS\n"
-                    f"📍 Delivery address: {order.location}\n\n"
+                    f"📍 Delivery address: {order.location}\n"
+                    f"📅 Date: {order.created_at}\n\n"
                 )
 
-        await message.answer(orders_text, reply_markup=main_menu_keyboard(language))
+        await message.answer(orders_text, reply_markup=expenses_keyboard(language))
 
 
 # Обработчик кнопки "Профиль"
@@ -519,7 +445,6 @@ async def profile_callback(message: types.Message, state: FSMContext):
                 f"📱 Имя: {user.full_name}\n"
                 f"📞 Номер телефона: {user.phone_number}\n"
                 f"📍 Адрес: {user.address}\n"
-                f"💵 Баланс: {user.balance} сум\n"
                 f"💸 Всего потрачено: {user.total_spent} сум"
             )
         else:
@@ -528,7 +453,6 @@ async def profile_callback(message: types.Message, state: FSMContext):
                 f"📱 Name: {user.full_name}\n"
                 f"📞 Phone number: {user.phone_number}\n"
                 f"📍 Address: {user.address}\n"
-                f"💵 Balance: {user.balance} UZS\n"
                 f"💸 Total spent: {user.total_spent} UZS"
             )
 

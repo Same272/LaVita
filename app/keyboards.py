@@ -19,7 +19,7 @@ def main_menu_keyboard(language="ru"):
                 [KeyboardButton(text="👤 Профиль")],
                 [KeyboardButton(text="📦 Активные заказы")],
                 [KeyboardButton(text="📜 История заказов")],
-                [KeyboardButton(text="💰 Баланс и траты")]
+                [KeyboardButton(text="💰 Траты")]
             ],
             resize_keyboard=True
         )
@@ -31,7 +31,7 @@ def main_menu_keyboard(language="ru"):
                 [KeyboardButton(text="👤 Profile")],
                 [KeyboardButton(text="📦 Active Orders")],
                 [KeyboardButton(text="📜 Order History")],
-                [KeyboardButton(text="💰 Balance & Expenses")]
+                [KeyboardButton(text="💰 Expenses")]
             ],
             resize_keyboard=True
         )
