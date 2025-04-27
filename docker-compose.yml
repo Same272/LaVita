@@ -1,0 +1,12 @@
+version: '3.13'
+
+services:
+  app:
+    build: .
+    container_name: my_python_app
+    command: python app/main.py
+    volumes:
+      - .:/app
+    working_dir: /app
+    ports:
+      - "8000:8000"  # поменяй, если у тебя другой порт

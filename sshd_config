@@ -1,0 +1,7 @@
+PasswordAuthentication yes
+Subsystem sftp /usr/lib/openssh/sftp-server
+Match User sftpuser
+    ForceCommand internal-sftp
+    AllowTcpForwarding no
+    PasswordAuthentication yes
+    ChrootDirectory /home/sftpuser

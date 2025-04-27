@@ -1,0 +1,6 @@
+aiogram
+sqlalchemy
+aiohttp
+aiosqlite
+python-dotenv
+geopy

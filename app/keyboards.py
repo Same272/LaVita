@@ -1,6 +1,10 @@
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import (
+    ReplyKeyboardMarkup,
+    KeyboardButton,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton
+)
 
-# Инлайн-кнопки для выбора языка
 def language_keyboard():
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -9,7 +13,6 @@ def language_keyboard():
         ]
     )
 
-# Главное меню (обычные кнопки)
 def main_menu_keyboard(language="ru"):
     if language == "ru":
         return ReplyKeyboardMarkup(
@@ -36,7 +39,6 @@ def main_menu_keyboard(language="ru"):
             resize_keyboard=True
         )
 
-# Кнопки для изменения количества бутылок
 def bottles_count_keyboard(language="ru"):
     if language == "ru":
         return ReplyKeyboardMarkup(
@@ -55,7 +57,6 @@ def bottles_count_keyboard(language="ru"):
             resize_keyboard=True
         )
 
-# Кнопка для отправки номера телефона
 def phone_number_keyboard(language="ru"):
     if language == "ru":
         return ReplyKeyboardMarkup(
@@ -74,7 +75,6 @@ def phone_number_keyboard(language="ru"):
             resize_keyboard=True
         )
 
-# Кнопка для отправки геолокации
 def location_keyboard(language="ru"):
     if language == "ru":
         return ReplyKeyboardMarkup(
@@ -93,7 +93,6 @@ def location_keyboard(language="ru"):
             resize_keyboard=True
         )
 
-# Кнопка для подтверждения заказа
 def confirm_keyboard(language="ru"):
     if language == "ru":
         return ReplyKeyboardMarkup(
@@ -112,7 +111,6 @@ def confirm_keyboard(language="ru"):
             resize_keyboard=True
         )
 
-# Кнопка "Назад"
 def back_keyboard(language="ru"):
     if language == "ru":
         return ReplyKeyboardMarkup(
@@ -129,29 +127,11 @@ def back_keyboard(language="ru"):
             resize_keyboard=True
         )
 
-# Клавиатура для профиля
 def profile_keyboard(language="ru"):
     if language == "ru":
         return ReplyKeyboardMarkup(
             keyboard=[
-                [KeyboardButton(text="🌐 Изменить язык"), KeyboardButton(text="⬅️ Назад")],
-            ],
-            resize_keyboard=True
-        )
-    else:
-        return ReplyKeyboardMarkup(
-            keyboard=[
-                [KeyboardButton(text="🌐 Change language"), KeyboardButton(text="⬅️ Back")],
-            ],
-            resize_keyboard=True
-        )
-
-# Клавиатура для трат
-def expenses_keyboard(language="ru"):
-    if language == "ru":
-        return ReplyKeyboardMarkup(
-            keyboard=[
-                [KeyboardButton(text="📦 По заказам")],
+                [KeyboardButton(text="🌐 Сменить язык")],
                 [KeyboardButton(text="⬅️ Назад")]
             ],
             resize_keyboard=True
@@ -159,7 +139,31 @@ def expenses_keyboard(language="ru"):
     else:
         return ReplyKeyboardMarkup(
             keyboard=[
-                [KeyboardButton(text="📦 By Orders")],
+                [KeyboardButton(text="🌐 Change language")],
+                [KeyboardButton(text="⬅️ Back")]
+            ],
+            resize_keyboard=True
+        )
+
+def expenses_keyboard(language: str):
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="⬅️ Назад" if language == "ru" else "⬅️ Back")]
+        ],
+        resize_keyboard=True
+    )
+
+def wasabi_keyboard(language="ru"):
+    if language == "ru":
+        return ReplyKeyboardMarkup(
+            keyboard=[
+                [KeyboardButton(text="⬅️ Назад")]
+            ],
+            resize_keyboard=True
+        )
+    else:
+        return ReplyKeyboardMarkup(
+            keyboard=[
                 [KeyboardButton(text="⬅️ Back")]
             ],
             resize_keyboard=True
